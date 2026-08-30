@@ -1,0 +1,54 @@
+name: Test notebooks
+
+"on":
+  push:
+    paths:
+      - "notebooks/**"
+      - "ci/**"
+      - ".github/workflows/test-notebooks.yml"
+  pull_request:
+    paths:
+      - "notebooks/**"
+      - "ci/**"
+      - ".github/workflows/test-notebooks.yml"
+  workflow_dispatch: {}
+
+jobs:
+  syntax-check:
+    name: Syntax check (fast gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1"
+      - run: julia ci/syntax_check.jl notebooks/*.jl notebooks/oil_gas/*.jl
+
+  run-notebooks:
+    name: Run ${{ matrix.notebook }}
+    needs: syntax-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        notebook:
+          - notebooks/01_intro_ode_diffeq.jl
+          - notebooks/02_neural_ode.jl
+          - notebooks/03_universal_differential_equations.jl
+          - notebooks/04_parameter_estimation.jl
+          - notebooks/05_physics_informed_neural_networks.jl
+          - notebooks/06_sindy_model_discovery.jl
+          - notebooks/oil_gas/01_decline_curve_analysis.jl
+          - notebooks/oil_gas/02_neural_decline_forecasting.jl
+          - notebooks/oil_gas/03_material_balance_ude.jl
+          - notebooks/oil_gas/04_well_test_history_matching.jl
+          - notebooks/oil_gas/05_pressure_transient_pinn.jl
+          - notebooks/oil_gas/06_sindy_decline_law_discovery.jl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1"
+      - uses: julia-actions/cache@v2
+      - run: julia ci/run_notebook.jl ${{ matrix.notebook }}

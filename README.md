@@ -1,5 +1,7 @@
 # SciML Research — Julia + Pluto Examples
 
+[![Test notebooks](https://github.com/caxelrud/SciML_research/actions/workflows/test-notebooks.yml/badge.svg)](https://github.com/caxelrud/SciML_research/actions/workflows/test-notebooks.yml)
+
 Hands-on examples exploring the [SciML](https://sciml.ai/) ecosystem
 (Scientific Machine Learning) using [Julia](https://julialang.org/) and
 [Pluto.jl](https://plutojl.org/) reactive notebooks.
@@ -81,6 +83,20 @@ symbolic governing equations directly from data (6). The `oil_gas/`
 notebooks follow the same six-step arc grounded in production forecasting
 and reservoir/well-test engineering, and can be read either alongside their
 general-purpose counterpart or on their own.
+
+## Continuous integration
+
+Every push and pull request runs each notebook end-to-end in CI
+(`.github/workflows/test-notebooks.yml`), not just a syntax check. A
+notebook file's `# ╔═╡ <uuid>` cell markers are plain comments, so the
+whole file is ordinary top-to-bottom Julia source once opened outside
+Pluto — CI installs whatever the notebook's own `using` line asks for
+and `include`s it, and any thrown exception fails the job with a full
+stack trace. This is the same class of check that caught real bugs
+during development (type mismatches, wrong function signatures, a
+domain that made a PDE solver never converge) that a plain syntax check
+cannot see. See [`ci/run_notebook.jl`](ci/run_notebook.jl) and
+[`ci/syntax_check.jl`](ci/syntax_check.jl).
 
 ## References
 

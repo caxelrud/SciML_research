@@ -14,17 +14,17 @@ macro bind(def, element)
     end
 end
 
-# ╔═╡ 5330334e-2bdf-4955-94f7-b46befdc6ff3
+# ╔═╡ 74002011-f764-4fee-9971-801a3d343209
 md"""
 # 4 · Parameter estimation & inverse problems
 
 A very common SciML task: given noisy experimental observations and a mechanistic ODE model with *unknown* parameters, find the parameter values that best explain the data. This is the classic **inverse problem**, solved here by turning it into an optimization problem: minimize the mismatch between simulated and observed trajectories over the ODE parameters.
 """
 
-# ╔═╡ 2827adcf-4842-4240-b83f-4ff96171854c
-using OrdinaryDiffEq, SciMLSensitivity, Optimization, OptimizationOptimJL, Plots, Random, PlutoUI
+# ╔═╡ b2a5e353-67f4-4769-8e49-3c9197398592
+using OrdinaryDiffEq, Optimization, OptimizationOptimJL, Plots, Random, PlutoUI
 
-# ╔═╡ c560a03b-eef1-4e18-81af-a9635bb7bf0d
+# ╔═╡ 1761c94b-11c7-4729-93cb-b485f326fbcc
 md"""
 ## 1. The model: a SIR epidemic
 
@@ -33,7 +33,7 @@ $$\dot S = -\beta S I, \qquad \dot I = \beta S I - \gamma I, \qquad \dot R = \ga
 $\beta$ is the infection rate and $\gamma$ the recovery rate. In a real setting these come from data fitting rather than being known constants.
 """
 
-# ╔═╡ 945519d8-bb04-4394-ad2e-6ec139a59ff3
+# ╔═╡ 51d548e3-e962-4449-a512-c69600f8b3f5
 function sir!(du, u, p, t)
 	S, I, R = u
 	β, γ = p
@@ -43,14 +43,14 @@ function sir!(du, u, p, t)
 	return nothing
 end
 
-# ╔═╡ 8fa7d8d2-ae85-4445-baa7-3424a96fde93
+# ╔═╡ 71c19bdb-fe3a-461a-893e-192227685dc6
 md"""
 ## 2. Generate noisy "observed" data
 
 We simulate with known true parameters, then add Gaussian observation noise — mimicking real measurement error.
 """
 
-# ╔═╡ ce790b23-ccbc-45b4-8c31-b488bfcd21b8
+# ╔═╡ 940aea8b-ffbd-466a-acfb-39af74bc7555
 begin
 	rng4 = Random.default_rng()
 	Random.seed!(rng4, 7)
@@ -67,26 +67,26 @@ begin
 	sir_data = Array(sir_sol) .+ noise_level .* randn(rng4, size(Array(sir_sol)))
 end
 
-# ╔═╡ 596dd851-a351-4af3-b310-772ac2079036
+# ╔═╡ 37ba20ac-ce83-4bc5-9719-4670881398d4
 begin
 	scatter(tsteps_sir, sir_data[2, :]; label="observed I(t)", xlabel="t", ylabel="fraction of population")
 	plot!(tsteps_sir, Array(sir_sol)[2, :]; label="true I(t)", lw=2)
 end
 
-# ╔═╡ 164aa1f2-3d3b-4208-9f14-c5622281591e
+# ╔═╡ 6bba8741-a2ad-4ce4-a67b-5d6d845add24
 md"""
 ## 3. Loss landscape
 
 Before fitting, it helps to see how sensitive the mismatch is to each parameter. Drag the sliders below and watch the simulated curve chase the noisy data.
 """
 
-# ╔═╡ 5aeff909-49b5-40f0-ba38-1a26565c9cf6
+# ╔═╡ bbb3e22e-ed62-45d8-b8ed-75579d876fac
 @bind β_guess Slider(0.1:0.02:0.8, default=0.3, show_value=true)
 
-# ╔═╡ a86e4cf4-e82e-4385-aa76-96d39bec0f01
+# ╔═╡ 071353b0-5e87-4521-a35b-eae8e57c1eaf
 @bind γ_guess Slider(0.02:0.02:0.5, default=0.2, show_value=true)
 
-# ╔═╡ 7a4481d4-db98-4a5e-8238-5a33018e3540
+# ╔═╡ f0dec18f-2875-4ee5-8123-63f69836a66c
 begin
 	guess_prob = remake(sir_prob; p=[β_guess, γ_guess])
 	guess_sol = solve(guess_prob, Tsit5(); saveat=tsteps_sir)
@@ -97,14 +97,14 @@ begin
 		title="sum of squared error = $(round(guess_loss, digits=4))")
 end
 
-# ╔═╡ f1697c44-de81-4ef7-8d39-94cc803ca5e6
+# ╔═╡ 1a0f266f-2ce0-47b1-88c5-e21dcd3f0e95
 md"""
 ## 4. Fit the parameters automatically
 
 Rather than tuning sliders by hand, we let `Optimization.jl` minimize the sum-of-squares loss directly. Because the loss only needs a forward `solve`, we can use a derivative-free or a gradient-based local optimizer — here we use `Optim.jl`'s Nelder–Mead via `OptimizationOptimJL`.
 """
 
-# ╔═╡ 3b1e9915-c6a1-439c-96d6-5a30f07e2cd2
+# ╔═╡ cc921c14-4b1c-4bf7-ade1-195218b57018
 function sir_loss(p, _)
 	prob = remake(sir_prob; p=p)
 	sol = solve(prob, Tsit5(); saveat=tsteps_sir)
@@ -112,7 +112,7 @@ function sir_loss(p, _)
 	return sum(abs2, sir_data .- Array(sol))
 end
 
-# ╔═╡ 64a83a78-9cd8-44c6-ab36-936de33bb71f
+# ╔═╡ 74955415-3dbf-4f2a-8a8d-f0498f49ae37
 begin
 	p0 = [0.2, 0.3]   # initial guess, deliberately off from the truth
 	optf4 = OptimizationFunction(sir_loss)
@@ -120,17 +120,17 @@ begin
 	fit_res = Optimization.solve(optprob4, OptimizationOptimJL.NelderMead())
 end
 
-# ╔═╡ b7386ffe-11c5-4e88-92a3-094aeeffe91e
+# ╔═╡ 09169668-bc8c-49f1-a29b-80fa96b1b3d0
 (fitted_β=fit_res.u[1], fitted_γ=fit_res.u[2], true_β=true_β, true_γ=true_γ)
 
-# ╔═╡ 089b8eb8-e211-4ad5-919c-33b6429dedc5
+# ╔═╡ 04e6efb9-35bc-42b6-8a96-d5cd4fd92100
 begin
 	fitted_sol = solve(remake(sir_prob; p=fit_res.u), Tsit5(); saveat=tsteps_sir)
 	scatter(tsteps_sir, sir_data[2, :]; label="data", xlabel="t", ylabel="I(t)")
 	plot!(tsteps_sir, Array(fitted_sol)[2, :]; label="fitted model", lw=2, title="Recovered SIR fit")
 end
 
-# ╔═╡ 3eb00ec2-1b5e-462a-b159-bad056bd931d
+# ╔═╡ 018add5c-f619-4e6d-ad91-cacfb5d1d2e9
 md"""
 ## Takeaways
 
@@ -140,20 +140,20 @@ md"""
 """
 
 # ╔═╡ Cell order:
-# ╟─5330334e-2bdf-4955-94f7-b46befdc6ff3
-# ╠═2827adcf-4842-4240-b83f-4ff96171854c
-# ╟─c560a03b-eef1-4e18-81af-a9635bb7bf0d
-# ╠═945519d8-bb04-4394-ad2e-6ec139a59ff3
-# ╟─8fa7d8d2-ae85-4445-baa7-3424a96fde93
-# ╠═ce790b23-ccbc-45b4-8c31-b488bfcd21b8
-# ╠═596dd851-a351-4af3-b310-772ac2079036
-# ╟─164aa1f2-3d3b-4208-9f14-c5622281591e
-# ╠═5aeff909-49b5-40f0-ba38-1a26565c9cf6
-# ╠═a86e4cf4-e82e-4385-aa76-96d39bec0f01
-# ╠═7a4481d4-db98-4a5e-8238-5a33018e3540
-# ╟─f1697c44-de81-4ef7-8d39-94cc803ca5e6
-# ╠═3b1e9915-c6a1-439c-96d6-5a30f07e2cd2
-# ╠═64a83a78-9cd8-44c6-ab36-936de33bb71f
-# ╠═b7386ffe-11c5-4e88-92a3-094aeeffe91e
-# ╠═089b8eb8-e211-4ad5-919c-33b6429dedc5
-# ╟─3eb00ec2-1b5e-462a-b159-bad056bd931d
+# ╟─74002011-f764-4fee-9971-801a3d343209
+# ╠═b2a5e353-67f4-4769-8e49-3c9197398592
+# ╟─1761c94b-11c7-4729-93cb-b485f326fbcc
+# ╠═51d548e3-e962-4449-a512-c69600f8b3f5
+# ╟─71c19bdb-fe3a-461a-893e-192227685dc6
+# ╠═940aea8b-ffbd-466a-acfb-39af74bc7555
+# ╠═37ba20ac-ce83-4bc5-9719-4670881398d4
+# ╟─6bba8741-a2ad-4ce4-a67b-5d6d845add24
+# ╠═bbb3e22e-ed62-45d8-b8ed-75579d876fac
+# ╠═071353b0-5e87-4521-a35b-eae8e57c1eaf
+# ╠═f0dec18f-2875-4ee5-8123-63f69836a66c
+# ╟─1a0f266f-2ce0-47b1-88c5-e21dcd3f0e95
+# ╠═cc921c14-4b1c-4bf7-ade1-195218b57018
+# ╠═74955415-3dbf-4f2a-8a8d-f0498f49ae37
+# ╠═09169668-bc8c-49f1-a29b-80fa96b1b3d0
+# ╠═04e6efb9-35bc-42b6-8a96-d5cd4fd92100
+# ╟─018add5c-f619-4e6d-ad91-cacfb5d1d2e9

@@ -4,7 +4,7 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 15b5f862-02fe-42eb-8c6f-edf193d60a79
+# ╔═╡ eb709ba6-0571-433d-a9a7-2188f27429cc
 md"""
 # 2 · Neural ODEs
 
@@ -15,22 +15,22 @@ $$\dot u = f_\theta(u, t)$$
 where $f_\theta$ is a small neural network with trainable parameters $\theta$. Training means: simulate the ODE forward, compare to data, and backpropagate *through the ODE solver* to update $\theta$. This notebook trains a neural ODE to reproduce a 2D spiral trajectory, following the classic example from Chen et al. (2018), *Neural Ordinary Differential Equations*.
 """
 
-# ╔═╡ cd436a19-abad-49c8-99ea-9bea52c61ce4
+# ╔═╡ fda6fc57-a084-4534-87f4-b4fa7815abce
 using Lux, OrdinaryDiffEq, SciMLSensitivity, Optimization, OptimizationOptimisers, ComponentArrays, Random, Plots
 
-# ╔═╡ b217208c-c9b2-431b-942b-3f9f4494c302
+# ╔═╡ 38f9aeb1-5eda-45fa-b0cf-55f71b7dcd5a
 md"""
 ## 1. Generate synthetic "ground truth" data
 
 We pretend we don't know the true dynamics and only observe noiseless samples of a 2D spiral produced by a simple linear ODE $\dot u = Au$.
 """
 
-# ╔═╡ da941467-3549-4cfd-9a88-1590735978fe
+# ╔═╡ a308c01a-ad6b-4c0f-bf8f-32636a4714f3
 begin
 	rng = Random.default_rng()
 	Random.seed!(rng, 1)
 
-	true_A = [-0.1 2.0; -2.0 -0.1]
+	true_A = Float32[-0.1 2.0; -2.0 -0.1]
 	true_odefunc(u, p, t) = true_A * (u .^ 3)   # nonlinear spiral (cubic term)
 
 	u0_true = Float32[2.0, 0.0]
@@ -42,52 +42,52 @@ begin
 	ode_data = Array(true_sol)
 end
 
-# ╔═╡ 2795b34b-5dfd-4037-b1cf-c008739f7540
+# ╔═╡ 5cc3817a-f689-43e5-812f-3d0dce05da20
 scatter(tsteps, ode_data[1, :]; label="u₁ (data)", xlabel="t", title="Observed spiral trajectory (state 1)")
 
-# ╔═╡ b85ddfb2-4919-4982-8b02-9af675ebeed7
+# ╔═╡ 98399a9f-2f23-466b-adfd-6a4fc24e50c0
 md"""
 ## 2. Define the neural ODE
 
 Instead of the (unknown, in a real problem) true dynamics, we parameterize $f_\theta$ with a small `Lux` multilayer perceptron and wrap it in an `ODEProblem`.
 """
 
-# ╔═╡ f7eeda23-9a2a-417f-bcc1-5751c0e27cbb
+# ╔═╡ 58eb339d-33ff-4035-be77-54d1ceb6321e
 begin
 	nn_dynamics = Chain(Dense(2, 16, tanh), Dense(16, 16, tanh), Dense(16, 2))
 	ps_init, st = Lux.setup(rng, nn_dynamics)
 	ps_init = ComponentArray(ps_init)
 end
 
-# ╔═╡ f6a4732f-17c4-43cb-a4db-e372d33cc740
+# ╔═╡ 392afa83-72c2-4467-b433-f4dc78b1134b
 function neural_ode_func(u, p, t)
 	û, _ = nn_dynamics(u, p, st)
 	return û
 end
 
-# ╔═╡ 14207813-8c4e-4e8e-8870-68fd565940de
+# ╔═╡ 4870cefb-2c73-4533-9d24-8f31c2361095
 prob_neural = ODEProblem(neural_ode_func, u0_true, tspan)
 
-# ╔═╡ 3b9da8e0-a86d-4c6d-b99b-bf996b846b57
+# ╔═╡ 489839c5-f017-4568-a93d-51c59df213b5
 md"""
 ## 3. Loss function and training loop
 
 The loss re-solves the neural ODE with the current parameters and compares against the data. `SciMLSensitivity` provides the adjoint methods that make `solve` differentiable with respect to `p`, so `Optimization.jl` can minimize the loss with a standard gradient-based optimizer.
 """
 
-# ╔═╡ 2535d1ef-3317-4c80-8831-9ebcf17c58e0
+# ╔═╡ 75c97823-d6e2-401b-80de-1d8260cf044b
 function predict_neural_ode(p)
 	solve(prob_neural, Tsit5(); p=p, saveat=tsteps,
 		sensealg=InterpolatingAdjoint(; autojacvec=ZygoteVJP())) |> Array
 end
 
-# ╔═╡ 9e9d705e-606d-48fa-8492-1c2c698ed648
+# ╔═╡ f0370f28-a75b-4089-a740-e25c97ba02d3
 function loss_neural_ode(p, _)
 	pred = predict_neural_ode(p)
 	return sum(abs2, ode_data .- pred)
 end
 
-# ╔═╡ b2b0f32b-a4d3-4a49-b0f2-a766ae5ed6c0
+# ╔═╡ d93010c4-0b9a-4ea3-8f49-8df9b5e6b111
 begin
 	adtype = Optimization.AutoZygote()
 	optf = OptimizationFunction(loss_neural_ode, adtype)
@@ -102,22 +102,22 @@ begin
 	res1 = Optimization.solve(optprob, OptimizationOptimisers.Adam(0.05); callback=callback, maxiters=300)
 end
 
-# ╔═╡ 9ecc43e1-6c72-48ce-9e8d-0fb5b19d7ece
+# ╔═╡ e3efc67b-e078-4c03-bb06-c1bc3aa64cf7
 plot(losses; xlabel="iteration", ylabel="loss", yscale=:log10, label="training loss", title="Neural ODE training")
 
-# ╔═╡ bab00663-4b6b-45be-8162-1fcb19273082
+# ╔═╡ da31f11c-8926-4164-b997-ce89a25e7a9a
 md"""
 ## 4. Compare the learned dynamics to the ground truth
 """
 
-# ╔═╡ 057ddff9-dbe8-497a-988f-af92ac76e1b6
+# ╔═╡ c10ee6f0-cb26-4d89-a0eb-24a7c44d4933
 begin
 	fitted = predict_neural_ode(res1.u)
 	plot(tsteps, ode_data[1, :]; label="data (u₁)", lw=2, xlabel="t")
 	plot!(tsteps, fitted[1, :]; label="neural ODE (u₁)", lw=2, ls=:dash)
 end
 
-# ╔═╡ dc2a7300-5f59-4927-ad6d-da3f32171f3d
+# ╔═╡ da65432e-d910-471a-9172-6c81b7c394be
 md"""
 ## Takeaways
 
@@ -129,20 +129,20 @@ Next: [`03_universal_differential_equations.jl`](./03_universal_differential_equ
 """
 
 # ╔═╡ Cell order:
-# ╟─15b5f862-02fe-42eb-8c6f-edf193d60a79
-# ╠═cd436a19-abad-49c8-99ea-9bea52c61ce4
-# ╟─b217208c-c9b2-431b-942b-3f9f4494c302
-# ╠═da941467-3549-4cfd-9a88-1590735978fe
-# ╠═2795b34b-5dfd-4037-b1cf-c008739f7540
-# ╟─b85ddfb2-4919-4982-8b02-9af675ebeed7
-# ╠═f7eeda23-9a2a-417f-bcc1-5751c0e27cbb
-# ╠═f6a4732f-17c4-43cb-a4db-e372d33cc740
-# ╠═14207813-8c4e-4e8e-8870-68fd565940de
-# ╟─3b9da8e0-a86d-4c6d-b99b-bf996b846b57
-# ╠═2535d1ef-3317-4c80-8831-9ebcf17c58e0
-# ╠═9e9d705e-606d-48fa-8492-1c2c698ed648
-# ╠═b2b0f32b-a4d3-4a49-b0f2-a766ae5ed6c0
-# ╠═9ecc43e1-6c72-48ce-9e8d-0fb5b19d7ece
-# ╟─bab00663-4b6b-45be-8162-1fcb19273082
-# ╠═057ddff9-dbe8-497a-988f-af92ac76e1b6
-# ╟─dc2a7300-5f59-4927-ad6d-da3f32171f3d
+# ╟─eb709ba6-0571-433d-a9a7-2188f27429cc
+# ╠═fda6fc57-a084-4534-87f4-b4fa7815abce
+# ╟─38f9aeb1-5eda-45fa-b0cf-55f71b7dcd5a
+# ╠═a308c01a-ad6b-4c0f-bf8f-32636a4714f3
+# ╠═5cc3817a-f689-43e5-812f-3d0dce05da20
+# ╟─98399a9f-2f23-466b-adfd-6a4fc24e50c0
+# ╠═58eb339d-33ff-4035-be77-54d1ceb6321e
+# ╠═392afa83-72c2-4467-b433-f4dc78b1134b
+# ╠═4870cefb-2c73-4533-9d24-8f31c2361095
+# ╟─489839c5-f017-4568-a93d-51c59df213b5
+# ╠═75c97823-d6e2-401b-80de-1d8260cf044b
+# ╠═f0370f28-a75b-4089-a740-e25c97ba02d3
+# ╠═d93010c4-0b9a-4ea3-8f49-8df9b5e6b111
+# ╠═e3efc67b-e078-4c03-bb06-c1bc3aa64cf7
+# ╟─da31f11c-8926-4164-b997-ce89a25e7a9a
+# ╠═c10ee6f0-cb26-4d89-a0eb-24a7c44d4933
+# ╟─da65432e-d910-471a-9172-6c81b7c394be

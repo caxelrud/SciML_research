@@ -4,7 +4,7 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 86c9364b-763c-4200-b9e7-fc7b0e4ab470
+# ╔═╡ 212b5cc1-7b88-4c8d-94c9-d96d84dcbb2c
 md"""
 # O&G · 6 — Discovering the decline law itself from production data
 
@@ -13,17 +13,17 @@ Every earlier notebook in this series *assumed* a model form (Arps, a Fetkovich 
 We use **SINDy** ([`06_sindy_model_discovery.jl`](../06_sindy_model_discovery.jl)) on a well whose true (but, to the algorithm, unknown) behavior is harmonic decline ($b=1$ in the Arps family), which happens to correspond to the clean autonomous ODE $\dot q = -\frac{D_i}{q_i}q^2$ — a single quadratic term. If SINDy is given a library rich enough to contain that term, sparse regression should isolate it automatically.
 """
 
-# ╔═╡ 49a35caa-69a3-4b94-b0f2-ffa2c722cae5
+# ╔═╡ 4db4239c-63e1-4bf0-9379-52d44faed166
 using DataDrivenDiffEq, DataDrivenSparse, ModelingToolkit, OrdinaryDiffEq, Random, Plots
 
-# ╔═╡ f88dd5a8-c09e-40e6-b45d-13bb01e1fdeb
+# ╔═╡ a9fd94b6-bdf6-4107-bd8b-52e6f622c62e
 md"""
 ## 1. A harmonically declining well
 
 $$\dot q = -\frac{D_i}{q_i}\,q^2$$
 """
 
-# ╔═╡ 34dd3c94-eae7-430a-9d0b-53a83695423c
+# ╔═╡ f8ffbffb-328a-4216-9f8e-dacdbf7c619b
 function harmonic_decline!(du, u, p, t)
 	Di, qi = p
 	q = u[1]
@@ -31,7 +31,7 @@ function harmonic_decline!(du, u, p, t)
 	return nothing
 end
 
-# ╔═╡ 86d1e37e-f745-45a4-91fd-9c111e41c9b3
+# ╔═╡ 827b1a66-7e38-486c-be07-7277ab43cdf6
 begin
 	rng_og6 = Random.default_rng()
 	Random.seed!(rng_og6, 9)
@@ -47,17 +47,17 @@ begin
 	tq = well_sol.t
 end
 
-# ╔═╡ 51078487-a34e-4ab5-9c7f-f49d4938667c
+# ╔═╡ 59865103-1f04-4833-baa5-22b77d8c9ea5
 plot(tq, Xq[1, :]; xlabel="time (yr)", ylabel="q (bbl/d)", label="production history given to SINDy")
 
-# ╔═╡ eb3f58de-d826-4fd6-a21d-e4ee2e26d799
+# ╔═╡ 2b1f3603-9cb0-42f7-a45c-fbdc9d33459e
 md"""
 ## 2. Build the `DataDrivenProblem`
 
 As in the general SINDy notebook, we supply the derivative directly here (computable because we control the synthetic example); in practice `DataDrivenDiffEq.jl` can also estimate it from the trajectory by finite differencing or collocation.
 """
 
-# ╔═╡ a8cf1ae7-ab8e-4f72-8c91-0315e533de25
+# ╔═╡ df7ee3e5-9aa4-4314-a4f7-cb9b3e5193e4
 begin
 	DXq = similar(Xq)
 	for (i, ui) in enumerate(eachcol(Xq))
@@ -66,47 +66,47 @@ begin
 	ddprob_q = ContinuousDataDrivenProblem(Xq, tq; DX=DXq)
 end
 
-# ╔═╡ 726ea958-d8b2-498b-8b94-6ee41fbde811
+# ╔═╡ 92e96708-5a26-4ca0-bbb8-9a3fb4fb5ee3
 md"""
 ## 3. A polynomial candidate library
 
 We deliberately do *not* tell SINDy the true exponent — the library contains every monomial in $q$ up to degree 3, and sparse regression must pick out the one that actually matters.
 """
 
-# ╔═╡ 166cd62f-1ca5-4143-9de1-07d714a7a165
+# ╔═╡ 05ce4007-c224-4966-ac4b-66dcc603322f
 begin
 	@variables q
 	decline_basis = Basis(polynomial_basis([q], 3), [q])
 end
 
-# ╔═╡ 124b8a9a-12c4-437f-aa39-aa04579d1954
+# ╔═╡ 70b2de75-ba67-47aa-a473-191cda8c2b37
 begin
 	sparse_opt_q = STLSQ(exp10.(-6:0.25:1))
 	sindy_res_q = solve(ddprob_q, decline_basis, sparse_opt_q)
 	sindy_decline_law = get_basis(sindy_res_q)
 end
 
-# ╔═╡ e31da516-ee31-4efa-80a7-49aa2fb5886e
+# ╔═╡ 1c51cf72-4461-481c-873a-5a98a1f6309a
 println(sindy_decline_law)
 
-# ╔═╡ a16dcacc-8b03-47d0-98e7-fd8fc13e8fb1
-get_parameter_values(sindy_res_q)
+# ╔═╡ a422d295-5075-4c9e-bc07-f615bcfd2df4
+get_parameter_values(sindy_decline_law)
 
-# ╔═╡ fe9e040a-bf82-4163-99c8-979c9a2de256
+# ╔═╡ 6c37245b-dc3b-44f7-9065-c3feb4c59d7a
 md"""
 ## 4. Validate the discovered law by forecasting forward
 """
 
-# ╔═╡ 52c47181-c317-41f6-a843-129c3afa9e79
+# ╔═╡ b5af3064-bf14-4d3d-a2fc-4e2f6fa4c183
 begin
-	discovered_well_prob = ODEProblem(sindy_decline_law, [qi_og6], tspan_og6, get_parameter_values(sindy_res_q))
+	discovered_well_prob = ODEProblem(sindy_decline_law, [qi_og6], tspan_og6, get_parameter_values(sindy_decline_law))
 	discovered_well_sol = solve(discovered_well_prob, Tsit5(); saveat=saveat_og6)
 
 	plot(tq, Xq[1, :]; label="true harmonic decline", lw=2, xlabel="time (yr)", ylabel="q (bbl/d)")
 	plot!(tq, Array(discovered_well_sol)[1, :]; label="SINDy-discovered model", lw=2, ls=:dash)
 end
 
-# ╔═╡ bd775f82-8f23-4d73-9ce9-d31f64be0596
+# ╔═╡ d760e957-2afd-44f1-8528-faa407c0c84d
 md"""
 ## Takeaways
 
@@ -116,19 +116,19 @@ md"""
 """
 
 # ╔═╡ Cell order:
-# ╟─86c9364b-763c-4200-b9e7-fc7b0e4ab470
-# ╠═49a35caa-69a3-4b94-b0f2-ffa2c722cae5
-# ╟─f88dd5a8-c09e-40e6-b45d-13bb01e1fdeb
-# ╠═34dd3c94-eae7-430a-9d0b-53a83695423c
-# ╠═86d1e37e-f745-45a4-91fd-9c111e41c9b3
-# ╠═51078487-a34e-4ab5-9c7f-f49d4938667c
-# ╟─eb3f58de-d826-4fd6-a21d-e4ee2e26d799
-# ╠═a8cf1ae7-ab8e-4f72-8c91-0315e533de25
-# ╟─726ea958-d8b2-498b-8b94-6ee41fbde811
-# ╠═166cd62f-1ca5-4143-9de1-07d714a7a165
-# ╠═124b8a9a-12c4-437f-aa39-aa04579d1954
-# ╠═e31da516-ee31-4efa-80a7-49aa2fb5886e
-# ╠═a16dcacc-8b03-47d0-98e7-fd8fc13e8fb1
-# ╟─fe9e040a-bf82-4163-99c8-979c9a2de256
-# ╠═52c47181-c317-41f6-a843-129c3afa9e79
-# ╟─bd775f82-8f23-4d73-9ce9-d31f64be0596
+# ╟─212b5cc1-7b88-4c8d-94c9-d96d84dcbb2c
+# ╠═4db4239c-63e1-4bf0-9379-52d44faed166
+# ╟─a9fd94b6-bdf6-4107-bd8b-52e6f622c62e
+# ╠═f8ffbffb-328a-4216-9f8e-dacdbf7c619b
+# ╠═827b1a66-7e38-486c-be07-7277ab43cdf6
+# ╠═59865103-1f04-4833-baa5-22b77d8c9ea5
+# ╟─2b1f3603-9cb0-42f7-a45c-fbdc9d33459e
+# ╠═df7ee3e5-9aa4-4314-a4f7-cb9b3e5193e4
+# ╟─92e96708-5a26-4ca0-bbb8-9a3fb4fb5ee3
+# ╠═05ce4007-c224-4966-ac4b-66dcc603322f
+# ╠═70b2de75-ba67-47aa-a473-191cda8c2b37
+# ╠═1c51cf72-4461-481c-873a-5a98a1f6309a
+# ╠═a422d295-5075-4c9e-bc07-f615bcfd2df4
+# ╟─6c37245b-dc3b-44f7-9065-c3feb4c59d7a
+# ╠═b5af3064-bf14-4d3d-a2fc-4e2f6fa4c183
+# ╟─d760e957-2afd-44f1-8528-faa407c0c84d

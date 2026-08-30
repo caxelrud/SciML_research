@@ -4,35 +4,35 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ a0f245a8-928d-4ecf-8f05-7b24d0d30f40
+# ╔═╡ fa34b36c-16e3-475c-9e57-3d9ab843b60e
 md"""
 # O&G · 2 — Neural ODEs for production that doesn't follow Arps
 
 Arps decline curves ([`01_decline_curve_analysis.jl`](./01_decline_curve_analysis.jl)) assume smooth, boundary-dominated depletion. Real wells often deviate: workovers, temporary shut-ins, choke changes, and gauge-cycling all leave signatures a simple decline law can't represent. A **neural ODE** $\dot q = f_\theta(q, t)$ makes no such assumption — it learns whatever dynamics the data actually show.
 """
 
-# ╔═╡ ed76cfd8-afe7-4733-b8b5-16d9775409d6
+# ╔═╡ a4a01c27-10e6-4431-b3a4-50909648fd49
 using Lux, OrdinaryDiffEq, SciMLSensitivity, Optimization, OptimizationOptimisers, ComponentArrays, Random, Plots
 
-# ╔═╡ a22f41f4-ab9e-4b50-99a5-f575387f0fb9
+# ╔═╡ 99f6d4e2-c279-4eee-b588-225b40a5a242
 md"""
 ## 1. A well with an irregular production history
 
 We generate synthetic data from an *underlying* hyperbolic decline that is disturbed by a temporary shut-in (a dip around 1.5 years, e.g. for a workover) and a small periodic ripple (choke cycling). In a real dataset we would not know this structure — we only see the noisy rate history.
 """
 
-# ╔═╡ dd69a1dc-17f6-455f-b553-61576ce1c683
+# ╔═╡ 4cab93f6-78b2-4813-baaf-fda0a30f1036
 function true_well_dynamics!(du, u, p, t)
-	q = u[1]
+	q = max(u[1], 0.0)   # production rate can't go negative; guards the fractional power below
 	qi, Di, b = p
 	arps_term = -Di * q^(1 + b) / qi^b
-	workover_dip = -0.9 * q * exp(-((t - 1.5)^2) / (2 * 0.03^2))
+	workover_dip = -0.6 * q * exp(-((t - 1.5)^2) / (2 * 0.06^2))
 	choke_ripple = 0.08 * q * sin(2π * t / 0.25)
 	du[1] = arps_term + workover_dip + choke_ripple
 	return nothing
 end
 
-# ╔═╡ 2fc0fe76-0478-4d2c-aa5f-a23d414ea384
+# ╔═╡ d3e446ab-57b4-4daf-a7c8-53b1dba9f712
 begin
 	rng_og2 = Random.default_rng()
 	Random.seed!(rng_og2, 5)
@@ -47,53 +47,53 @@ begin
 	well_data = Array(true_sol_og2) .* (1 .+ 0.03 .* randn(rng_og2, 1, length(tsteps_og2)))
 end
 
-# ╔═╡ e03042df-8f19-4d79-b329-926d92ba129d
+# ╔═╡ e9d92f23-3096-4032-b245-d4ee211a82a8
 scatter(tsteps_og2, well_data[1, :]; label="reported rate", xlabel="time (yr)", ylabel="q (bbl/d)",
 	title="Irregular production history (workover dip + choke ripple)")
 
-# ╔═╡ 25fbcfc1-0ae1-4859-b7e2-5fbbe24cab16
+# ╔═╡ 8ca48dcd-d1f6-4e76-a0ca-1acff0d298bb
 md"""
 ## 2. A neural ODE with no assumed decline law
 
 The network sees both the current rate and the time, so it can in principle represent time-driven effects like the workover and the periodic ripple, not just state-driven decline.
 """
 
-# ╔═╡ 813a5337-0637-44b5-915b-5e28f2c7c693
+# ╔═╡ 18bac39f-1a1f-4bea-bece-5c52db48d55f
 begin
 	qnet = Chain(Dense(2, 20, tanh), Dense(20, 20, tanh), Dense(20, 1))
 	qnet_ps, qnet_st = Lux.setup(rng_og2, qnet)
 	qnet_ps = ComponentArray(qnet_ps)
 end
 
-# ╔═╡ fea1bfcb-6fa0-4cde-8e0f-4834a67a38ad
+# ╔═╡ 6ed05fb4-e391-460a-9b29-98f34d8a8f5b
 function neural_well_dynamics(u, p, t)
 	input = [u[1] / 1000.0, t]   # rescale the rate for a well-conditioned network input
 	ŷ, _ = qnet(input, p, qnet_st)
 	return 1000.0 .* ŷ
 end
 
-# ╔═╡ f26e9ce9-2e93-4cfe-aae7-30789e791e2b
+# ╔═╡ 5bbabdba-bc04-446e-b60b-dd304031ea95
 neural_well_prob = ODEProblem(neural_well_dynamics, u0_og2, tspan_og2)
 
-# ╔═╡ 31d561dd-e507-467d-ac74-6ac3a4d13bf3
+# ╔═╡ ec99cbea-e357-4307-b3eb-7903e36fcd29
 md"""
 ## 3. Train against the noisy history
 """
 
-# ╔═╡ b1c55615-3082-48ff-91d2-ea9f12890a64
+# ╔═╡ 0b62623d-ef6a-496a-8209-4ff1e99102e2
 function predict_well(p)
 	solve(neural_well_prob, Tsit5(); p=p, saveat=tsteps_og2,
 		sensealg=InterpolatingAdjoint(; autojacvec=ZygoteVJP())) |> Array
 end
 
-# ╔═╡ 04ca8edc-8be8-4fef-846b-09c24ecbfe46
+# ╔═╡ 7b4bdab5-d399-48f3-b4d5-d165aaec9cf7
 function loss_well(p, _)
 	pred = predict_well(p)
 	size(pred) == size(well_data) || return Inf
 	return sum(abs2, well_data .- pred)
 end
 
-# ╔═╡ 0c304947-e242-48aa-9bdd-8fc79e0e6a5d
+# ╔═╡ 38724ff9-5eb0-4e49-adca-73da63fd312a
 begin
 	optf_og2 = OptimizationFunction(loss_well, Optimization.AutoZygote())
 	optprob_og2 = OptimizationProblem(optf_og2, qnet_ps)
@@ -107,22 +107,22 @@ begin
 	res_well = Optimization.solve(optprob_og2, OptimizationOptimisers.Adam(0.02); callback=well_callback, maxiters=600)
 end
 
-# ╔═╡ 2af907f8-e14f-4b48-bba3-712380bc59bd
+# ╔═╡ 9aaa67ac-502d-45d7-b5d7-2dafff0733bc
 plot(well_losses; xlabel="iteration", ylabel="loss", yscale=:log10, label="training loss")
 
-# ╔═╡ d773e6de-1a74-46ca-b3a8-4c575adb5842
+# ╔═╡ 8f72054a-a4e1-4aef-8db1-f832ba3c6fa1
 md"""
 ## 4. Does the neural ODE capture the workover and the ripple?
 """
 
-# ╔═╡ 175ed34a-ba0d-45d5-849a-f988695e4e95
+# ╔═╡ 0012d2b1-e730-4d93-9d7a-dd9cbf1cbb47
 begin
 	neural_fit = predict_well(res_well.u)
 	scatter(tsteps_og2, well_data[1, :]; label="data", xlabel="time (yr)", ylabel="q (bbl/d)")
 	plot!(tsteps_og2, neural_fit[1, :]; label="neural ODE fit", lw=2)
 end
 
-# ╔═╡ dad660e9-b29a-4170-ae18-0be426f99772
+# ╔═╡ d55da8a5-cb44-4d5b-9611-10c2e4a09410
 md"""
 ## Takeaways
 
@@ -132,21 +132,21 @@ md"""
 """
 
 # ╔═╡ Cell order:
-# ╟─a0f245a8-928d-4ecf-8f05-7b24d0d30f40
-# ╠═ed76cfd8-afe7-4733-b8b5-16d9775409d6
-# ╟─a22f41f4-ab9e-4b50-99a5-f575387f0fb9
-# ╠═dd69a1dc-17f6-455f-b553-61576ce1c683
-# ╠═2fc0fe76-0478-4d2c-aa5f-a23d414ea384
-# ╠═e03042df-8f19-4d79-b329-926d92ba129d
-# ╟─25fbcfc1-0ae1-4859-b7e2-5fbbe24cab16
-# ╠═813a5337-0637-44b5-915b-5e28f2c7c693
-# ╠═fea1bfcb-6fa0-4cde-8e0f-4834a67a38ad
-# ╠═f26e9ce9-2e93-4cfe-aae7-30789e791e2b
-# ╟─31d561dd-e507-467d-ac74-6ac3a4d13bf3
-# ╠═b1c55615-3082-48ff-91d2-ea9f12890a64
-# ╠═04ca8edc-8be8-4fef-846b-09c24ecbfe46
-# ╠═0c304947-e242-48aa-9bdd-8fc79e0e6a5d
-# ╠═2af907f8-e14f-4b48-bba3-712380bc59bd
-# ╟─d773e6de-1a74-46ca-b3a8-4c575adb5842
-# ╠═175ed34a-ba0d-45d5-849a-f988695e4e95
-# ╟─dad660e9-b29a-4170-ae18-0be426f99772
+# ╟─fa34b36c-16e3-475c-9e57-3d9ab843b60e
+# ╠═a4a01c27-10e6-4431-b3a4-50909648fd49
+# ╟─99f6d4e2-c279-4eee-b588-225b40a5a242
+# ╠═4cab93f6-78b2-4813-baaf-fda0a30f1036
+# ╠═d3e446ab-57b4-4daf-a7c8-53b1dba9f712
+# ╠═e9d92f23-3096-4032-b245-d4ee211a82a8
+# ╟─8ca48dcd-d1f6-4e76-a0ca-1acff0d298bb
+# ╠═18bac39f-1a1f-4bea-bece-5c52db48d55f
+# ╠═6ed05fb4-e391-460a-9b29-98f34d8a8f5b
+# ╠═5bbabdba-bc04-446e-b60b-dd304031ea95
+# ╟─ec99cbea-e357-4307-b3eb-7903e36fcd29
+# ╠═0b62623d-ef6a-496a-8209-4ff1e99102e2
+# ╠═7b4bdab5-d399-48f3-b4d5-d165aaec9cf7
+# ╠═38724ff9-5eb0-4e49-adca-73da63fd312a
+# ╠═9aaa67ac-502d-45d7-b5d7-2dafff0733bc
+# ╟─8f72054a-a4e1-4aef-8db1-f832ba3c6fa1
+# ╠═0012d2b1-e730-4d93-9d7a-dd9cbf1cbb47
+# ╟─d55da8a5-cb44-4d5b-9611-10c2e4a09410

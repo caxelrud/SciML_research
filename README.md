@@ -24,6 +24,7 @@ plot outputs, no Julia required) — or open the `.jl` file to run it live.
 | [<img src="pdf/thumbnails/04_parameter_estimation.png" width="160">](pdf/04_parameter_estimation.pdf) | [`04_parameter_estimation.jl`](notebooks/04_parameter_estimation.jl) | Inverse problems: estimating unknown ODE parameters from noisy observations | `OrdinaryDiffEq`, `Optimization` |
 | [<img src="pdf/thumbnails/05_physics_informed_neural_networks.png" width="160">](pdf/05_physics_informed_neural_networks.pdf) | [`05_physics_informed_neural_networks.jl`](notebooks/05_physics_informed_neural_networks.jl) | Physics-Informed Neural Networks (PINNs): solving a 1D Poisson PDE without a mesh | `NeuralPDE`, `Lux`, `Optimization` |
 | [<img src="pdf/thumbnails/06_sindy_model_discovery.png" width="160">](pdf/06_sindy_model_discovery.pdf) | [`06_sindy_model_discovery.jl`](notebooks/06_sindy_model_discovery.jl) | Sparse model discovery (SINDy): recovering the Lorenz equations from trajectory data | `DataDrivenDiffEq`, `OrdinaryDiffEq` |
+| [<img src="pdf/thumbnails/07_bayesian_parameter_estimation.png" width="160">](pdf/07_bayesian_parameter_estimation.pdf) | [`07_bayesian_parameter_estimation.jl`](notebooks/07_bayesian_parameter_estimation.jl) | Bayesian inference: sampling the full posterior over ODE parameters with `Turing.jl`'s NUTS sampler instead of a single point estimate | `Turing`, `OrdinaryDiffEq` |
 
 ## Oil & Gas examples
 
@@ -39,10 +40,13 @@ engineering, and well testing:
 | [<img src="pdf/thumbnails/oil_gas_04_well_test_history_matching.png" width="160">](pdf/oil_gas/04_well_test_history_matching.pdf) | [`04_well_test_history_matching.jl`](notebooks/oil_gas/04_well_test_history_matching.jl) | History matching: recovering permeability and skin from a pressure drawdown test (the semi-log/MDH method) | `Optimization`, `ForwardDiff` |
 | [<img src="pdf/thumbnails/oil_gas_05_pressure_transient_pinn.png" width="160">](pdf/oil_gas/05_pressure_transient_pinn.pdf) | [`05_pressure_transient_pinn.jl`](notebooks/oil_gas/05_pressure_transient_pinn.jl) | A physics-informed neural network solving the radial diffusivity (pressure-transient) PDE for a bounded reservoir | `NeuralPDE`, `Lux`, `Optimization` |
 | [<img src="pdf/thumbnails/oil_gas_06_sindy_decline_law_discovery.png" width="160">](pdf/oil_gas/06_sindy_decline_law_discovery.pdf) | [`06_sindy_decline_law_discovery.jl`](notebooks/oil_gas/06_sindy_decline_law_discovery.jl) | Discovering the governing decline ODE directly from a rate history, with no assumed Arps form | `DataDrivenDiffEq`, `OrdinaryDiffEq` |
+| [<img src="pdf/thumbnails/oil_gas_07_multiphase_flow_buckley_leverett.png" width="160">](pdf/oil_gas/07_multiphase_flow_buckley_leverett.pdf) | [`07_multiphase_flow_buckley_leverett.jl`](notebooks/oil_gas/07_multiphase_flow_buckley_leverett.jl) | Multiphase flow: the Buckley–Leverett waterflood displacement, solved via Welge's tangent construction (`Roots.jl` + `ForwardDiff.jl`) instead of a mesh-based simulator | `ForwardDiff`, `Roots` |
 
 These mirror the general notebooks 1–6 one-for-one, applied to production
 forecasting, reservoir tank modeling, well testing, and model discovery instead
-of epidemiology, spirals, and the Lorenz system.
+of epidemiology, spirals, and the Lorenz system. Notebook 7 in each suite
+branches out on its own: Bayesian uncertainty quantification for the general
+set, and multiphase (two-phase) flow for the O&G set.
 
 Each notebook is self-contained: it declares its own dependencies in a
 `using`/`import` cell, and Pluto's built-in package manager resolves and

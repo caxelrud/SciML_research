@@ -39,12 +39,14 @@ jobs:
           - notebooks/04_parameter_estimation.jl
           - notebooks/05_physics_informed_neural_networks.jl
           - notebooks/06_sindy_model_discovery.jl
+          - notebooks/07_bayesian_parameter_estimation.jl
           - notebooks/oil_gas/01_decline_curve_analysis.jl
           - notebooks/oil_gas/02_neural_decline_forecasting.jl
           - notebooks/oil_gas/03_material_balance_ude.jl
           - notebooks/oil_gas/04_well_test_history_matching.jl
           - notebooks/oil_gas/05_pressure_transient_pinn.jl
           - notebooks/oil_gas/06_sindy_decline_law_discovery.jl
+          - notebooks/oil_gas/07_multiphase_flow_buckley_leverett.jl
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
